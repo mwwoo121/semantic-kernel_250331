@@ -133,6 +133,7 @@
     <Project Path="src/VectorData/InMemory/InMemory.csproj" />
     <Project Path="src/VectorData/Milvus/Milvus.csproj" />
     <Project Path="src/VectorData/MongoDB/MongoDB.csproj" />
+    <Project Path="src/VectorData/Oracle/Oracle.csproj" />
     <Project Path="src/VectorData/PgVector/PgVector.csproj" />
     <Project Path="src/VectorData/Pinecone/Pinecone.csproj" />
     <Project Path="src/VectorData/Qdrant/Qdrant.csproj" />
