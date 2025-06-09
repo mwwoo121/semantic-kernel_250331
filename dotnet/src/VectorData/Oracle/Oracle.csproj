@@ -15,8 +15,8 @@
 
   <PropertyGroup>
     <!-- NuGet Package Settings -->
-    <Title>Semantic Kernel - Oracle Database Vector Store Connector</Title>
-    <Description>Oracle Database Vector Store Connector for Semantic Kernel .NET </Description>
+    <Title>Semantic Kernel - Oracle Connector</Title>
+    <Description>Oracle Connector for Semantic Kernel plugins and semantic memory </Description>
   </PropertyGroup>
 
   <ItemGroup>
