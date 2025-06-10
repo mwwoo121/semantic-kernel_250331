@@ -309,6 +309,7 @@
     <Project Path="test/VectorData/InMemory.UnitTests/InMemory.UnitTests.csproj" />
     <Project Path="test/VectorData/MongoDB.ConformanceTests/MongoDB.ConformanceTests.csproj" />
     <Project Path="test/VectorData/MongoDB.UnitTests/MongoDB.UnitTests.csproj" />
+    <Project Path="test/VectorData/Oracle.UnitTests/Oracle.UnitTests.csproj" />
     <Project Path="test/VectorData/PgVector.ConformanceTests/PgVector.ConformanceTests.csproj" />
     <Project Path="test/VectorData/PgVector.UnitTests/PgVector.UnitTests.csproj" />
     <Project Path="test/VectorData/Pinecone.ConformanceTests/Pinecone.ConformanceTests.csproj" />

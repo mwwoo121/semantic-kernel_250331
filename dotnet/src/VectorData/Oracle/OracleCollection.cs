@@ -67,7 +67,6 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     public OracleCollection(OracleDataSource dataSource, string name, bool bOwnDataSource = true, OracleCollectionOptions? options = default)
         : this(() => new OracleDbClient(dataSource, bOwnDataSource), name, options)
     {
-
     }
 
     /// <summary>
@@ -290,13 +289,13 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
         }
 
-        //TODO_Martha:  For now, support primary key only.
+        //For now, support primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
         return this.RunOperationAsync<TRecord?>(OperationName, async () =>
         {
             Dictionary<string, object?>? row = await this._client.GetAsync(this._metadata, 1, (keyColumnName, [key]), includeVectors, cancellationToken).ConfigureAwait(false);
 
-            if (row is null) return default;
+            if (row is null) { return default; }
             return this._mapper.MapFromStorageToDataModel(row, includeVectors);
         });
     }
@@ -314,7 +313,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
         }
 
-        //TODO_Martha:  For now, support primary key only.
+        //For now, support primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
         //TODO_Martha, there might be a better way to convery IEnumerable<Tkey> keys to object[]
         object[] objKeys = new object[keys.Count<TKey>()];
@@ -334,7 +333,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             this._collectionMetadata
             );
     }
-  
+
     /// <inheritdoc/>
     public override Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
     {
@@ -375,14 +374,14 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     private static byte[] ToByteArray(BitArray bits)
     {
         int numBytes = bits.Count / 8;
-        if (bits.Count % 8 != 0) numBytes++;
+        if (bits.Count % 8 != 0) { numBytes++; }
 
         byte[] bytes = new byte[numBytes];
         int byteIndex = 0, bitIndex = 0;
 
         for (int i = 0; i < bits.Count; i++)
         {
-            if (bits[i]) bytes[byteIndex] |= (byte)(1 << (7 - bitIndex));
+            if (bits[i]) { bytes[byteIndex] |= (byte)(1 << (7 - bitIndex)); }
 
             bitIndex++;
             if (bitIndex == 8)
