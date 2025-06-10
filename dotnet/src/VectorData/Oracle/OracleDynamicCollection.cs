@@ -1,6 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-#if!READY
+#if !READY
 using System;
 using System.Collections.Generic;
 using Oracle.Connectors.Common;
@@ -33,7 +33,7 @@ public sealed class OracleDynamicCollection : OracleCollection<object, Dictionar
     /// <param name="name">The name of the collection.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     public OracleDynamicCollection(string connectionString, string name, OracleCollectionOptions options)
-        : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bDisposeDataSource: true), name, options)
+        : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bOwnDataSource: true), name, options)
     {
     }
 

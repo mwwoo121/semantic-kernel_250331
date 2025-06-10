@@ -33,7 +33,7 @@ internal sealed class OracleDbClient : IDisposable
     #endregion instant fields
 
 #if NET8_0_OR_GREATER
-    public OracleDbClient(OracleDataSource dataSource, bool bOwnDataSource)
+    internal OracleDbClient(OracleDataSource dataSource, bool bOwnDataSource)
     {
         OracleConnection? conn = null;
         try

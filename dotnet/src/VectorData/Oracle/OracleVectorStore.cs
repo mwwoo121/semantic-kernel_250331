@@ -1,4 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
+
 #if !READY
 using System;
 using System.Collections.Generic;
@@ -146,6 +147,9 @@ public sealed class OracleVectorStore : VectorStore
         return
             serviceKey is not null ? null :
             serviceType == typeof(VectorStoreMetadata) ? this._metadata :
+#if NET8_0_OR_GREATER
+            serviceType == typeof(OracleDataSource) ? this._client.DataSource :
+#endif
             serviceType.IsInstanceOfType(this) ? this :
             null;
     }

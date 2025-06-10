@@ -18,6 +18,7 @@ using Microsoft.Extensions.VectorData.ProviderServices;
 using Microsoft.SemanticKernel;
 using Oracle.Connectors.Common;
 using Oracle.ManagedDataAccess.Client;
+using Oracle.ManagedDataAccess.Types;
 using static Microsoft.Extensions.VectorData.VectorStoreErrorHandler;
 
 namespace SemanticKernel.Connectors.Oracle;
@@ -59,12 +60,12 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     /// </summary>
     /// <param name="dataSource">The data source to use for connecting to the database.</param>
     /// <param name="name">The name of the collection.</param>
-    /// <param name="bDisposeDataSource">A value indicating whether <paramref name="dataSource"/> is disposed when the collection is disposed.</param>
+    /// <param name="bOwnDataSource">A value indicating whether the collection owns the <paramref name="dataSource"/>.  When it is set to true, the datasource is disposed when the collection is disposed.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     [RequiresDynamicCode("This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate OracleDynamicCollection instead.")]
     [RequiresUnreferencedCode("This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate OracleDynamicCollection instead")]
-    public OracleCollection(OracleDataSource dataSource, string name, bool bDisposeDataSource, OracleCollectionOptions? options = default)
-        : this(() => new OracleDbClient(dataSource, bDisposeDataSource), name, options)
+    public OracleCollection(OracleDataSource dataSource, string name, bool bOwnDataSource = true, OracleCollectionOptions? options = default)
+        : this(() => new OracleDbClient(dataSource, bOwnDataSource), name, options)
     {
 
     }
@@ -78,9 +79,8 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     [RequiresDynamicCode("This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate PostgresDynamicCollection instead.")]
     [RequiresUnreferencedCode("This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate PostgresDynamicCollection instead")]
     public OracleCollection(string connectionString, string name, OracleCollectionOptions? options = default)
-                : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bOwnDataSource: true), name, options)
-
-    { 
+        : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bOwnDataSource: true), name, options)
+    {
         Verify.NotNullOrWhiteSpace(connectionString);
     }
 
@@ -142,7 +142,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     {
         const string OperationName = "DoesTableExists";
         return this.RunOperationAsync(OperationName, () =>
-            this._client.IsTableExistAsync(this._metadata.TableName, this._metadata.SchemaName, cancellationToken)
+            this._client.IsTableExistAsync(this._metadata.QualifiedTableName, cancellationToken)
         );
     }
 
@@ -160,7 +160,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     {
         const string OperationName = "DeleteCollection";
         return this.RunOperationAsync(OperationName, () =>
-            this._client.DeleteCollectionAsync(this._metadata.QualifiedTableName, cancellationToken)
+            this._client.DeleteTableAsync(this._metadata.QualifiedTableName, cancellationToken)
         );
     }
 
@@ -191,13 +191,6 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
                 generatedEmbeddings ??= new IReadOnlyList<Embedding>?[vectorPropertyCount];
                 generatedEmbeddings[i] = [await floatTask.ConfigureAwait(false)];
             }
-#if NET8_0_OR_GREATER
-            else if (vectorProperty.TryGenerateEmbedding<TRecord, Embedding<Half>>(record, cancellationToken, out var halfTask))
-            {
-                generatedEmbeddings ??= new IReadOnlyList<Embedding>?[vectorPropertyCount];
-                generatedEmbeddings[i] = [await halfTask.ConfigureAwait(false)];
-            }
-#endif
             else
             {
                 throw new InvalidOperationException(
@@ -263,13 +256,6 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
                 generatedEmbeddings ??= new IReadOnlyList<Embedding>?[vectorPropertyCount];
                 generatedEmbeddings[i] = (IReadOnlyList<Embedding<float>>)await floatTask.ConfigureAwait(false);
             }
-#if NET8_0_OR_GREATER
-            else if (vectorProperty.TryGenerateEmbeddings<TRecord, Embedding<Half>>(records, cancellationToken, out var halfTask))
-            {
-                generatedEmbeddings ??= new IReadOnlyList<Embedding>?[vectorPropertyCount];
-                generatedEmbeddings[i] = (IReadOnlyList<Embedding<Half>>)await halfTask.ConfigureAwait(false);
-            }
-#endif
             else
             {
                 throw new InvalidOperationException(
@@ -328,7 +314,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
         }
 
-        //For now, support primary key only.
+        //TODO_Martha:  For now, support primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
         //TODO_Martha, there might be a better way to convery IEnumerable<Tkey> keys to object[]
         object[] objKeys = new object[keys.Count<TKey>()];
@@ -386,6 +372,28 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
 
     #region Search
 
+    private static byte[] ToByteArray(BitArray bits)
+    {
+        int numBytes = bits.Count / 8;
+        if (bits.Count % 8 != 0) numBytes++;
+
+        byte[] bytes = new byte[numBytes];
+        int byteIndex = 0, bitIndex = 0;
+
+        for (int i = 0; i < bits.Count; i++)
+        {
+            if (bits[i]) bytes[byteIndex] |= (byte)(1 << (7 - bitIndex));
+
+            bitIndex++;
+            if (bitIndex == 8)
+            {
+                bitIndex = 0;
+                byteIndex++;
+            }
+        }
+
+        return bytes;
+    }
     /// <inheritdoc />
     public override async IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(
         TInput searchValue,
@@ -403,55 +411,111 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
         }
 
         var vectorProperty = this._model.GetVectorPropertyOrSingle(options);
+        OracleVectorColumnInfo vectorCol = this._metadata.VectorColumnsByDbObjName[this._metadata.DataStorageNameToDbObjNameMappings[vectorProperty.StorageName]];
+        OracleVector? vector = null;
 
-        object vector = searchValue switch
+        if (!OracleModelBuilder.IsVectorPropertyTypeValidCore(searchValue.GetType(), out _))
         {
-            // Dense float32
-            ReadOnlyMemory<float> r => r,
-            float[] f => new ReadOnlyMemory<float>(f),
-            Embedding<float> e => e.Vector,
-            _ when vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, Embedding<float>> generator
-                => await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false),
+            if (vectorProperty.EmbeddingGenerator == null)
+            {
+                throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), OracleModelBuilder.SupportedVectorTypes));
+            }
+            else
+            {
+                OracleDbType vectorDbType = vectorCol.OraDbType;
 
-#if NET8_0_OR_GREATER
-            // Dense float16
-            ReadOnlyMemory<Half> r => r,
-            Half[] f => new ReadOnlyMemory<Half>(f),
-            Embedding<Half> e => e.Vector,
-            _ when vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, Embedding<Half>> generator
-                => await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false),
-#endif
+                switch (vectorDbType)
+                {
+                    case OracleDbType.Vector_Float32:
+                    {
+                        //The generator is available and we will use the embedding generator to generate embedding if the embedding generator
+                        //generate the embedding with same numeric format as the embedding type the Vector property.
+                        //If the provided search value is not of the vector embedding type, then need to use the Embedding generator to generate the embedding
+                        if (vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, Embedding<float>> generator)
+                        {
+                            vector = new((await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false)).ToArray());
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()));
+                        }
+                        break;
+                    }
+                    case OracleDbType.Vector_Float64:
+                    {
+                        //The generator is available and we will use the embedding generator to generate embedding if the embedding generator
+                        //generate the embedding with same numeric format as the embedding type the Vector property.
+                        //If the provided search value is not of the vector embedding type, then need to use the Embedding generator to generate the embedding
+                        if (vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, Embedding<double>> generator)
+                        {
+                            vector = new((await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false)).ToArray());
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()));
+                        }
+                        break;
+                    }
+                    case OracleDbType.Vector_Int8:
+                    {
+                        //The generator is available and we will use the embedding generator to generate embedding if the embedding generator
+                        //generate the embedding with same numeric format as the embedding type the Vector property.
+                        //If the provided search value is not of the vector embedding type, then need to use the Embedding generator to generate the embedding
+                        //TODO_Martha:  Not sure if it the embedding generator type should be byte or short
+                        if (vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, Embedding<byte>> generator)
+                        {
+                            await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false);
+                            vector = new((await generator.GenerateVectorAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false)).ToArray());
 
-            // Dense Binary
-            BitArray b => b,
-            // TODO: Uncomment once we sync to the latest MEAI
-            // BinaryEmbedding e => e.Vector,
-            // _ when vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TVector, BinaryEmbedding> generator
-            //     => (await generator.GenerateEmbeddingAsync(value, cancellationToken: cancellationToken).ConfigureAwait(false)).Vector,
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()));
+                        }
+                        break;
+                    }
+                    case OracleDbType.Vector_Binary:
+                    {
+                        //The generator is available and we will use the embedding generator to generate embedding if the embedding generator
+                        //generate the embedding with same numeric format as the embedding type the Vector property.
+                        //If the provided search value is not of the vector embedding type, then need to use the Embedding generator to generate the embedding
+                        //TODO_Martha:  Not sure if it the embedding generator type should be bool, BitArray or byte.
+                        if (vectorProperty.EmbeddingGenerator is IEmbeddingGenerator<TInput, BinaryEmbedding> generator)
+                        {
+                            BinaryEmbedding binaryVector = await generator.GenerateAsync(searchValue, cancellationToken: cancellationToken).ConfigureAwait(false);
+                            BitArray bits = binaryVector.Vector;
+                            byte[] bytes = ToByteArray(bits);
 
-            // Sparse
-            SparseVector sv => sv,
-            // TODO: Add a PG-specific SparseVectorEmbedding type
+                            vector = new(bytes);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()));
+                        }
+                        break;
+                    }
+                }
+            }
+        }
 
-            _ => vectorProperty.EmbeddingGenerator is null
-                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), PostgresModelBuilder.SupportedVectorTypes))
-                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
-        };
+        if (vector == null)
+        {
+            throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), OracleModelBuilder.SupportedVectorTypes));
+        }
 
-        var pgVector = PostgresPropertyMapping.MapVectorForStorageModel(vector);
+        OracleLambdaFilterTranslator? lambdaTransalator = null;
+        if (options.Filter != null)
+        {
+            lambdaTransalator = new(this._metadata.Model, options.Filter);
+        }
 
-        Verify.NotNull(pgVector);
-
-        // Simulating skip/offset logic locally, since OFFSET can work only with LIMIT in combination
-        // and LIMIT is not supported in vector search extension, instead of LIMIT - "k" parameter is used.
-        var limit = top + options.Skip;
-
-        var records = PostgresUtils.WrapAsyncEnumerableAsync(
+        //TODO_Martha: We need to check what the vector distance to use in order to set BAsc = true or false in SearchAsync.
+        var records = OracleUtils.WrapAsyncEnumerableAsync(
             this._client
-                .GetNearestMatchesAsync(this.Name, this._model, vectorProperty, pgVector, top, options, cancellationToken)
-                .SelectAsync(result => new VectorSearchResult<TRecord>(
-                    this._mapper.MapFromStorageToDataModel(result.Row, options.IncludeVectors),
-                    result.Distance),
+            .SearchAsync(this._metadata, vectorCol.Name, vectorCol.DistanceStrategy, true, vector, top, options.Skip, options.IncludeVectors, lambdaTransalator, cancellationToken)
+            .SelectAsync(result => new VectorSearchResult<TRecord>(
+                this._mapper.MapFromStorageToDataModel(result.Row, options.IncludeVectors),
+                result.Distance),
                 cancellationToken),
             operationName: "Search",
             this._collectionMetadata)
@@ -474,13 +538,26 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
 
         options ??= new();
 
-        return PostgresUtils.WrapAsyncEnumerableAsync(
-            this._client.GetMatchingRecordsAsync(this.Name, this._model, filter, top, options, cancellationToken)
+        OracleLambdaFilterTranslator? lambdaTransalator = null;
+        if (filter != null)
+        {
+            lambdaTransalator = new(this._metadata.Model, filter);
+        }
+
+        OracleSqlOrderByTranslator? orderByTranslator = null;
+        //TODO_Martha:  Orderby Clause
+        if (options.OrderBy != null)
+        {
+            //orderByTranslator = new();
+        }
+
+        return OracleUtils.WrapAsyncEnumerableAsync(
+            this._client.GetByFilterAsync(this._metadata, top, options.Skip, options.IncludeVectors, lambdaTransalator, orderByTranslator, cancellationToken)
                 .SelectAsync(dictionary =>
                 {
                     return this._mapper.MapFromStorageToDataModel(dictionary, options.IncludeVectors);
                 }, cancellationToken),
-            "Get",
+            "GetAsync",
             this._collectionMetadata);
     }
 
@@ -492,7 +569,9 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
         return
             serviceKey is not null ? null :
             serviceType == typeof(VectorStoreCollectionMetadata) ? this._collectionMetadata :
-            serviceType == typeof(NpgsqlDataSource) ? this._client.DataSource :
+#if NET8_0_OR_GREATER
+            serviceType == typeof(OracleDataSource) ? this._client.DataSource :
+#endif
             serviceType.IsInstanceOfType(this) ? this :
             null;
     }
@@ -503,7 +582,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     }
 
     private Task RunOperationAsync(string operationName, Func<Task> operation)
-        => VectorStoreErrorHandler.RunOperationAsync<NpgsqlException>(
+        => VectorStoreErrorHandler.RunOperationAsync<OracleException>(
             this._collectionMetadata,
             operationName,
             operation);
