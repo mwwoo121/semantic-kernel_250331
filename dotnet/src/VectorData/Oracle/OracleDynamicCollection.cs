@@ -1,6 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-#if READY
+#if!READY
 using System;
 using System.Collections.Generic;
 using Oracle.Connectors.Common;

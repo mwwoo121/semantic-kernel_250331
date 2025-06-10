@@ -33,7 +33,7 @@ internal sealed class OracleDbClient : IDisposable
     #endregion instant fields
 
 #if NET8_0_OR_GREATER
-    internal OracleDbClient(OracleDataSource dataSource, bool bOwnDataSource)
+    public OracleDbClient(OracleDataSource dataSource, bool bOwnDataSource)
     {
         OracleConnection? conn = null;
         try
@@ -261,12 +261,12 @@ internal sealed class OracleDbClient : IDisposable
     OracleDataModelMetadata metadata,
     int itemCount,
     (string, object[]) key,
-    bool bIncludedVectors = false,
+    bool bIncludeVectors = false,
     CancellationToken cancellationToken = default)
     {
         //TODO_MARTHA : Add bInclduedVectors parameters
         OracleSqlCommandInfo sqlCmdInfo = OracleCommandGenerator.BuildGetByKeysCommand(
-            metadata, itemCount, [key]);
+            metadata, bIncludeVectors, itemCount, [key]);
 
         using (OracleConnection connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -274,7 +274,7 @@ internal sealed class OracleDbClient : IDisposable
             {
                 if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    return this.GetRow(metadata, reader, bIncludedVectors);
+                    return this.GetRow(metadata, reader, bIncludeVectors);
                 }
             }
             return null;
@@ -288,9 +288,8 @@ internal sealed class OracleDbClient : IDisposable
         bool bIncludeVectors = false,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        //TODO_MARTHA : Add bInclduedVectors parameters
         OracleSqlCommandInfo sqlCmdInfo = OracleCommandGenerator.BuildGetByKeysCommand(
-            metadata, itemCount, keys);
+            metadata, bIncludeVectors, itemCount, keys);
 
         using (OracleConnection connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
         {

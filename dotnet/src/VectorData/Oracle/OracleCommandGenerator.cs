@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -63,30 +63,6 @@ internal static class OracleCommandGenerator
         }
     }
 
-    /* TODO_Jiacheng, I added the GenerateSQL in the vector Index type classes;
-     * Would you add the generate SQL implementation in the Generate SQL of the IVF and HNSW index class 
-     * My layer can call the GenerateSQL() to generate the SQL when the vector index exists */
-    //internal static IEnumerable<OracleSqlCommandInfo> BuildCreateVectorIndexCommands(OracleDataModelMetadata tableMetadata)
-    //{
-    //    StringBuilder sqlBlr = new();
-    //    foreach (var vectorColumnInfo in tableMetadata.VectorColumns.Values)
-    //    {
-    //        sqlBlr.Clear();
-
-    //        string sqlStr = vectorColumnInfo.IndexType switch
-    //        {
-    //            OracleInternalHNSWVectorIndex hnswVectorIndex => CreateHNSWIndexSQL(tableMetadata.TableName, vectorColumnInfo.Name, hnswVectorIndex, vectorColumnInfo.DistanceStrategy),
-    //            OracleInternalIVFVectorIndex ivfVectorIndex => CreateIVFIndexSQL(tableMetadata.TableName, vectorColumnInfo.Name, ivfVectorIndex, vectorColumnInfo.DistanceStrategy),
-    //            _ => ""
-    //        };
-
-    //        yield return new OracleSqlCommandInfo()
-    //        {
-    //            SqlText = sqlStr
-    //        };
-    //    }
-    //}
-
     internal static OracleSqlCommandInfo BuildDropTableCommand(string qualifiedTableName)
     {
         return new OracleSqlCommandInfo()
@@ -145,7 +121,10 @@ internal static class OracleCommandGenerator
         };
     }
 
-    internal static OracleSqlCommandInfo BuildGetByKeysCommand(OracleDataModelMetadata metadata, int itemCount, List<(string keyColName, object[] values)> compositeKeys)
+
+    //TODO_Jiacheng:  Please include bIncludeVector in the generated SQL
+    //When bIncludeVector = false, don't include vector columns in the generated SQL.
+    internal static OracleSqlCommandInfo BuildGetByKeysCommand(OracleDataModelMetadata metadata, bool bIncludeVector, int itemCount, List<(string keyColName, object[] values)> compositeKeys)
     {
         if (compositeKeys == null || compositeKeys.Count == 0)
         {

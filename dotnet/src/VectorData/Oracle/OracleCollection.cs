@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
-#if READY
+#if !READY
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -78,8 +78,9 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     [RequiresDynamicCode("This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate PostgresDynamicCollection instead.")]
     [RequiresUnreferencedCode("This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate PostgresDynamicCollection instead")]
     public OracleCollection(string connectionString, string name, OracleCollectionOptions? options = default)
-        : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bDisposeDataSource: true), name, options)
-    {
+                : this(() => new OracleDbClient(OracleUtils.CreateDataSource(connectionString), bOwnDataSource: true), name, options)
+
+    { 
         Verify.NotNullOrWhiteSpace(connectionString);
     }
 
@@ -327,7 +328,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
         }
 
-        //TODO_Martha:  For now, support primary key only.
+        //For now, support primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
         //TODO_Martha, there might be a better way to convery IEnumerable<Tkey> keys to object[]
         object[] objKeys = new object[keys.Count<TKey>()];
