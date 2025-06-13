@@ -21,6 +21,8 @@ internal class OracleSqlCommandInfo
     public OracleCommand ToOracleCommand(OracleConnection connection, OracleTransaction? transaction = null)
     {
         OracleCommand cmd = connection.CreateCommand();
+        cmd.ArrayBindCount = this.ArrayBindCount;
+
         if (transaction != null)
         {
             cmd.Transaction = transaction;

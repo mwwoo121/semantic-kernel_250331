@@ -126,11 +126,15 @@ internal static class OracleCommandGenerator
     //When bIncludeVector = false, don't include vector columns in the generated SQL.
     internal static OracleSqlCommandInfo BuildGetByKeysCommand(OracleDataModelMetadata metadata, bool bIncludeVector, int itemCount, List<(string keyColName, object[] values)> compositeKeys)
     {
+        //TODO_Jiacheng.  When the data passed to you from the OracleDbClient, the values of the parameter should be populated to your layer properly.
+        //No need to check.  If the parameters are not passed in properly, it will be the issues with our implemenetations.
+        //So you can assume that they are correct.
         if (compositeKeys == null || compositeKeys.Count == 0)
         {
             throw new ArgumentException("Composite keys cannot be null or empty", nameof(compositeKeys));
         }
 
+        //TODO_Jiacheng.  Same comments as above.  No need to check.
         // Check if all arrays have the same length
         if (itemCount == 0 || !compositeKeys.All(key => key.values.Length == itemCount))
         {
@@ -143,7 +147,7 @@ internal static class OracleCommandGenerator
         int index = 0;
         foreach ((var keyColName, var values) in compositeKeys)
         {
-            sqlBlr.Append($"${keyColName} = :p{index} AND ");
+            sqlBlr.Append($"{keyColName} = :p{index} AND ");
             parameters.Add(new OracleParameter($"p{index}", metadata.PrimaryKeyColumnsByDbObjName[keyColName].OraDbType, ParameterDirection.Input)
             {
                 Value = (itemCount > 1) ? values : values[0],
@@ -158,7 +162,7 @@ internal static class OracleCommandGenerator
         {
             SqlText = sqlBlr.ToString(),
             Parameters = parameters,
-            ArrayBindCount = itemCount
+            ArrayBindCount = (itemCount > 1) ? itemCount : 0
         };
     }
 
@@ -208,6 +212,10 @@ internal static class OracleCommandGenerator
             throw new ArgumentException("Rows cannot be null or empty", nameof(rows));
         }
 
+        //TODO_Jiacheng:  Some issues in the generated SQL.  Cannot execute.  I do not quite understand the SQL and so can't fix it.
+        //Several items need your attentions though.
+        //1. When the row with the keys existed.  it should not set the values of the key.
+        //2. "FROM DUAL" is in the SQL.  Is it intended.
         int itemCount = rows.Count;
 
         List<OracleParameter> parameters = new(metadata.AllColumnsByDbObjName.Count);
@@ -227,7 +235,7 @@ internal static class OracleCommandGenerator
         sqlBlr.AppendJoin(", ", metadata.AllColumnsByDbObjName.Keys.Select(colName => $"d.{colName} = s.{colName}"));
         sqlBlr.Append(" WHEN NOT MATCHED THEN INSERT ( ");
         sqlBlr.AppendJoin(", ", metadata.AllColumnsByDbObjName.Keys.Select(colName => $"d.{colName}"));
-        sqlBlr.Append(" ) VAULES ( ");
+        sqlBlr.Append(" ) VALUES ( ");
         sqlBlr.AppendJoin(", ", metadata.AllColumnsByDbObjName.Keys.Select(colName => $"s.{colName}"));
         sqlBlr.Append(" )");
 

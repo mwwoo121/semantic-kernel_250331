@@ -264,7 +264,6 @@ internal sealed class OracleDbClient : IDisposable
     bool bIncludeVectors = false,
     CancellationToken cancellationToken = default)
     {
-        //TODO_MARTHA : Add bInclduedVectors parameters
         OracleSqlCommandInfo sqlCmdInfo = OracleCommandGenerator.BuildGetByKeysCommand(
             metadata, bIncludeVectors, itemCount, [key]);
 

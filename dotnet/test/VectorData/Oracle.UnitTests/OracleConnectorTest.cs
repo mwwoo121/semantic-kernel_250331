@@ -35,6 +35,8 @@ public partial class OracleConnectorTest
         this.DbClient = new OracleDbClient(this._dataSource, false);
     }
 
+    internal OracleVectorStore VectorStore { get; init; }
+
     internal OracleDbClient DbClient { get; init; }
 
     internal OracleDatabaseInfo DatabaseInfo { get; init; }

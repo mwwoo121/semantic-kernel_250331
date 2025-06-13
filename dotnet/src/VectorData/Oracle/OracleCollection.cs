@@ -201,7 +201,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
 
         Verify.NotNull(storageModel);
 
-        var keyObj = storageModel[this._model.KeyProperty.StorageName];
+        var keyObj = storageModel[this._metadata.DataStorageNameToDbObjNameMappings[this._model.KeyProperty.StorageName]];
         Verify.NotNull(keyObj);
         TKey key = (TKey)keyObj!;
 
@@ -269,7 +269,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             return;
         }
 
-        var keys = storageModels.Select(model => model[this._model.KeyProperty.StorageName]!).ToList();
+        var keys = storageModels.Select(model => model[this._metadata.DataStorageNameToDbObjNameMappings[this._model.KeyProperty.StorageName]]!).ToList();
 
         await this.RunOperationAsync(OperationName, () =>
             this._client.AddAsync(this._metadata, storageModels, cancellationToken, true)
@@ -339,7 +339,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
     {
         const string OperationName = "Delete";
 
-        //TODO_Martha:  For now, support primary key only.
+        //For now, support single primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
 
         return this.RunOperationAsync(OperationName, () =>
@@ -354,7 +354,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
 
         const string OperationName = "DeleteBatch";
 
-        //TODO_Martha:  For now, support primary key only.
+        //For now, support single primary key only.
         string keyColumnName = this._metadata.PrimaryKeyColumnsByDbObjName.Keys.First<string>();
         //TODO_Martha, there might be a better way to convery IEnumerable<Tkey> keys to object[]
         object[] objKeys = new object[keys.Count<TKey>()];
@@ -508,7 +508,7 @@ public class OracleCollection<TKey, TRecord> : VectorStoreCollection<TKey, TReco
             lambdaTransalator = new(this._metadata.Model, options.Filter);
         }
 
-        //TODO_Martha: We need to check what the vector distance to use in order to set BAsc = true or false in SearchAsync.
+        //TODO_Martha: We need to check what the vector distance to use in order to set Asc = true or false in SearchAsync.
         var records = OracleUtils.WrapAsyncEnumerableAsync(
             this._client
             .SearchAsync(this._metadata, vectorCol.Name, vectorCol.DistanceStrategy, true, vector, top, options.Skip, options.IncludeVectors, lambdaTransalator, cancellationToken)

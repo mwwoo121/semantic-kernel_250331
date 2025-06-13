@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -86,9 +86,13 @@ internal class OracleModelBuilder() : CollectionModelBuilder(OracleModelBuilder.
     }
 
     /// <inheritdoc />
+    /// TOD0_Martha: We need to check for embedding<byte> for BINARY and embedding<short> for INT8.</short></byte>
     protected override Type? ResolveEmbeddingType(
         VectorPropertyModel vectorProperty,
         IEmbeddingGenerator embeddingGenerator,
         Type? userRequestedEmbeddingType)
-        => vectorProperty.ResolveEmbeddingType<Embedding<float>>(embeddingGenerator, userRequestedEmbeddingType);
+        => vectorProperty.ResolveEmbeddingType<Embedding<float>>(embeddingGenerator, userRequestedEmbeddingType)
+            ?? vectorProperty.ResolveEmbeddingType<Embedding<double>>(embeddingGenerator, userRequestedEmbeddingType)
+            ?? vectorProperty.ResolveEmbeddingType<Embedding<byte>>(embeddingGenerator, userRequestedEmbeddingType)
+            ?? vectorProperty.ResolveEmbeddingType<Embedding<short>>(embeddingGenerator, userRequestedEmbeddingType);
 };

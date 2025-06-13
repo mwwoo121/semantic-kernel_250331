@@ -40,16 +40,16 @@ public sealed class OracleVectorStore : VectorStore
     /// Initializes a new instance of the <see cref="OracleVectorStore"/> class.
     /// </summary>
     /// <param name="dataSource">Oracle  data source.</param>
-    /// <param name="bDisposeDataSource">A value indicating whether <paramref name="dataSource"/> is disposed when this instance of <see cref="OracleVectorStore"/> is disposed.</param>
+    /// <param name="bOwnDataSource">A value indicating whether <paramref name="dataSource"/> is disposed when this instance of <see cref="OracleVectorStore"/> is disposed.</param>
     /// <param name="options">Optional configuration options for this class</param>
-    public OracleVectorStore(OracleDataSource dataSource, bool bDisposeDataSource, OracleVectorStoreOptions? options = default)
+    public OracleVectorStore(OracleDataSource dataSource, bool bOwnDataSource = true, OracleVectorStoreOptions? options = default)
     {
         Verify.NotNull(dataSource);
 
         options ??= OracleVectorStoreOptions.Defaults;
         this._schema = options.Schema;
         this._embeddingGenerator = options?.EmbeddingGenerator;
-        this._client = new OracleDbClient(dataSource, bDisposeDataSource);
+        this._client = new OracleDbClient(dataSource, bOwnDataSource);
 
         this._metadata = new()
         {
@@ -64,7 +64,7 @@ public sealed class OracleVectorStore : VectorStore
     /// <param name="connectionString">Oracle database connection string.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     public OracleVectorStore(string connectionString, OracleVectorStoreOptions? options = default)
-        :this(OracleUtils.CreateDataSource(connectionString), bDisposeDataSource: true, options)
+        :this(OracleUtils.CreateDataSource(connectionString), bOwnDataSource: true, options)
     {
     }
 
